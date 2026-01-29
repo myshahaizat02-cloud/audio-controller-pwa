@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Controller</title>
+    <meta name="description" content="ESP32 Audio Tweeter Control Panel">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a1a2e">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔊</text></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">🔊</span>
+                <div class="logo-text">
+                    <h1>Audio Controller</h1>
+                    <p class="subtitle">ESP32 + PAM8403 + AXC1000</p>
+                </div>
+            </div>
+            <div class="connection-status" id="connectionStatus">
+                <span class="status-dot"></span>
+                <span class="status-text">Disconnected</span>
+            </div>
+        </header>
+
+        <!-- Main Control Card -->
+        <div class="card main-control">
+            <div class="card-header">
+                <h2>🎛️ Power Control</h2>
+                <span class="mode-badge" id="modeBadge">AUTO</span>
+            </div>
+            <div class="power-section">
+                <div class="power-status" id="powerStatus">
+                    <div class="power-icon off" id="powerIcon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2v10M18.4 6.6a9 9 0 1 1-12.8 0" />
+                        </svg>
+                    </div>
+                    <span class="power-label" id="powerLabel">OFF</span>
+                </div>
+                <div class="control-buttons">
+                    <button class="btn btn-on" id="btnOn" onclick="sendCommand('ON')">
+                        <span>🔊</span> ON
+                    </button>
+                    <button class="btn btn-off" id="btnOff" onclick="sendCommand('OFF')">
+                        <span>🔇</span> OFF
+                    </button>
+                    <button class="btn btn-auto" id="btnAuto" onclick="sendCommand('AUTO')">
+                        <span>🔄</span> AUTO
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Schedule Card -->
+        <div class="card schedule-card">
+            <div class="card-header">
+                <h2>⏰ Timer Schedule</h2>
+                <label class="toggle">
+                    <input type="checkbox" id="scheduleToggle" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="schedule-content">
+                <div class="time-inputs">
+                    <div class="time-group">
+                        <label>🕐 ON Time</label>
+                        <div class="time-input-wrapper">
+                            <input type="time" id="onTime" value="20:10">
+                        </div>
+                    </div>
+                    <div class="time-separator">+</div>
+                    <div class="time-group">
+                        <label>⏱️ Duration</label>
+                        <div class="duration-input-wrapper">
+                            <input type="number" id="duration" value="2" min="1" max="60">
+                            <span class="duration-unit">min</span>
+                        </div>
+                    </div>
+                </div>
+                <button class="btn btn-schedule" onclick="setSchedule()">
+                    💾 Save Schedule
+                </button>
+                <p class="schedule-info" id="scheduleInfo">
+                    Auto ON at 20:10 for 2 minutes
+                </p>
+            </div>
+        </div>
+
+        <!-- Status Card -->
+        <div class="card status-card">
+            <div class="card-header">
+                <h2>📊 Device Status</h2>
+                <span class="last-update" id="lastUpdate">--</span>
+            </div>
+            <div class="status-grid">
+                <div class="status-item">
+                    <span class="status-icon">📶</span>
+                    <div class="status-info">
+                        <span class="status-label">Connection</span>
+                        <span class="status-value" id="connStatus">--</span>
+                    </div>
+                </div>
+                <div class="status-item">
+                    <span class="status-icon">🌐</span>
+                    <div class="status-info">
+                        <span class="status-label">IP Address</span>
+                        <span class="status-value" id="ipAddress">--</span>
+                    </div>
+                </div>
+                <div class="status-item">
+                    <span class="status-icon">🕐</span>
+                    <div class="status-info">
+                        <span class="status-label">Device Time</span>
+                        <span class="status-value" id="deviceTime">--</span>
+                    </div>
+                </div>
+                <div class="status-item">
+                    <span class="status-icon">🔊</span>
+                    <div class="status-info">
+                        <span class="status-label">Audio</span>
+                        <span class="status-value" id="audioStatus">--</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Log Card -->
+        <div class="card log-card">
+            <div class="card-header">
+                <h2>📝 Activity Log</h2>
+                <button class="btn-clear" onclick="clearLog()">Clear</button>
+            </div>
+            <div class="log-container" id="logContainer">
+                <div class="log-item">
+                    <span class="log-time">--:--:--</span>
+                    <span class="log-message">Waiting for connection...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Audio Controller v2.0</p>
+            <p class="footer-link">MQTT Broker: broker.hivemq.com</p>
+        </footer>
+    </div>
+
+    <!-- MQTT Library -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
