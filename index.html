@@ -63,34 +63,24 @@
         <!-- Schedule Card -->
         <div class="card schedule-card">
             <div class="card-header">
-                <h2>⏰ Timer Schedule</h2>
+                <h2>⏰ Timer Schedules</h2>
                 <label class="toggle">
                     <input type="checkbox" id="scheduleToggle" checked>
                     <span class="toggle-slider"></span>
                 </label>
             </div>
             <div class="schedule-content">
-                <div class="time-inputs">
-                    <div class="time-group">
-                        <label>🕐 ON Time</label>
-                        <div class="time-input-wrapper">
-                            <input type="time" id="onTime" value="20:10">
-                        </div>
-                    </div>
-                    <div class="time-separator">+</div>
-                    <div class="time-group">
-                        <label>⏱️ Duration</label>
-                        <div class="duration-input-wrapper">
-                            <input type="number" id="duration" value="2" min="1" max="60">
-                            <span class="duration-unit">min</span>
-                        </div>
-                    </div>
+                <div class="schedule-list" id="scheduleList">
+                    <!-- Schedule entries will be added here -->
                 </div>
-                <button class="btn btn-schedule" onclick="setSchedule()">
-                    💾 Save Schedule
+                <button class="btn btn-add" id="btnAddSchedule" onclick="addScheduleRow()">
+                    ➕ Add Schedule
+                </button>
+                <button class="btn btn-schedule" onclick="saveAllSchedules()">
+                    💾 Save All Schedules
                 </button>
                 <p class="schedule-info" id="scheduleInfo">
-                    Auto ON at 20:10 for 2 minutes
+                    Click "Add Schedule" to create up to 5 schedules
                 </p>
             </div>
         </div>

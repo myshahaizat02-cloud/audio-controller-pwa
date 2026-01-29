@@ -334,6 +334,97 @@ body {
     color: var(--text-muted);
 }
 
+/* Schedule List */
+.schedule-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.schedule-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+}
+
+.schedule-num {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-primary);
+    border-radius: 50%;
+    font-size: 0.75rem;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.schedule-sep {
+    color: var(--text-muted);
+    font-size: 1.2rem;
+}
+
+.schedule-row .time-input-wrapper input[type="time"] {
+    padding: 8px 10px;
+    font-size: 1rem;
+    width: 100px;
+}
+
+.schedule-row .duration-input-wrapper {
+    padding: 6px 10px;
+}
+
+.schedule-row .duration-input-wrapper input[type="number"] {
+    width: 40px;
+    font-size: 1rem;
+}
+
+.btn-remove {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid var(--accent-danger);
+    border-radius: 50%;
+    color: var(--accent-danger);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.btn-remove:hover {
+    background: var(--accent-danger);
+    color: white;
+}
+
+.btn-add {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px dashed var(--border-color);
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+}
+
+.btn-add:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.btn-add:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 /* Duration Input */
 .duration-input-wrapper {
     display: flex;

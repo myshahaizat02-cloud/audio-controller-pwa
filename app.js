@@ -190,33 +190,117 @@ function sendCommand(command) {
     }
 }
 
-function setSchedule() {
+// ═══════════════════════════════════════════════════════════════
+// Multiple Schedules
+// ═══════════════════════════════════════════════════════════════
+
+const MAX_SCHEDULES = 5;
+let scheduleCount = 0;
+
+function addScheduleRow() {
+    if (scheduleCount >= MAX_SCHEDULES) {
+        addLog(`Maximum ${MAX_SCHEDULES} schedules allowed`, 'error');
+        return;
+    }
+
+    const container = document.getElementById('scheduleList');
+    const index = scheduleCount;
+    scheduleCount++;
+
+    const row = document.createElement('div');
+    row.className = 'schedule-row';
+    row.id = `schedule-row-${index}`;
+    row.innerHTML = `
+        <span class="schedule-num">${scheduleCount}</span>
+        <div class="time-input-wrapper">
+            <input type="time" id="onTime-${index}" value="08:00">
+        </div>
+        <span class="schedule-sep">+</span>
+        <div class="duration-input-wrapper">
+            <input type="number" id="duration-${index}" value="2" min="1" max="60">
+            <span class="duration-unit">min</span>
+        </div>
+        <button class="btn-remove" onclick="removeScheduleRow(${index})">✕</button>
+    `;
+
+    container.appendChild(row);
+    updateAddButton();
+    addLog(`Schedule ${scheduleCount} added`);
+}
+
+function removeScheduleRow(index) {
+    const row = document.getElementById(`schedule-row-${index}`);
+    if (row) {
+        row.remove();
+        scheduleCount--;
+        updateAddButton();
+        renumberSchedules();
+        addLog('Schedule removed');
+    }
+}
+
+function renumberSchedules() {
+    const rows = document.querySelectorAll('.schedule-row');
+    rows.forEach((row, i) => {
+        const numEl = row.querySelector('.schedule-num');
+        if (numEl) numEl.textContent = i + 1;
+    });
+}
+
+function updateAddButton() {
+    const btn = document.getElementById('btnAddSchedule');
+    if (scheduleCount >= MAX_SCHEDULES) {
+        btn.disabled = true;
+        btn.textContent = `Max ${MAX_SCHEDULES} schedules`;
+    } else {
+        btn.disabled = false;
+        btn.textContent = '➕ Add Schedule';
+    }
+}
+
+function saveAllSchedules() {
     if (!isConnected) {
         addLog('Not connected to broker', 'error');
         return;
     }
 
-    const onTime = document.getElementById('onTime').value;
-    const duration = document.getElementById('duration').value;
-
-    if (!onTime || !duration) {
-        addLog('Please set ON time and duration', 'error');
+    const rows = document.querySelectorAll('.schedule-row');
+    if (rows.length === 0) {
+        addLog('Add at least one schedule', 'error');
         return;
     }
 
-    // Validate duration (1-60 minutes)
-    const durationNum = parseInt(duration);
-    if (durationNum < 1 || durationNum > 60) {
-        addLog('Duration must be 1-60 minutes', 'error');
+    const schedules = [];
+    let valid = true;
+
+    rows.forEach((row) => {
+        const timeInput = row.querySelector('input[type="time"]');
+        const durationInput = row.querySelector('input[type="number"]');
+
+        if (timeInput && durationInput) {
+            const time = timeInput.value;
+            const duration = parseInt(durationInput.value);
+
+            if (!time || duration < 1 || duration > 60) {
+                valid = false;
+            } else {
+                schedules.push(`${time},${duration}`);
+            }
+        }
+    });
+
+    if (!valid) {
+        addLog('Invalid schedule values', 'error');
         return;
     }
 
-    const schedule = `${onTime},${duration}`;
-    client.publish(TOPIC_SCHEDULE, schedule);
+    // Format: "08:00,2;12:00,2;20:00,2"
+    const scheduleStr = schedules.join(';');
+    client.publish(TOPIC_SCHEDULE, scheduleStr);
 
-    addLog(`📅 Schedule set: ON at ${onTime} for ${duration} minutes`, 'success');
+    addLog(`📅 Saved ${schedules.length} schedule(s)`, 'success');
     document.getElementById('scheduleInfo').textContent =
-        `Auto ON at ${onTime} for ${duration} minutes`;
+        `${schedules.length} schedule(s) saved`;
 }
 
 // ═══════════════════════════════════════════════════════════════

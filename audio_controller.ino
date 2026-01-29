@@ -45,10 +45,13 @@ enum SoundType {
   SOUND_SWEEP = 5
 };
 
-// Timer Schedule (ON time + duration in minutes)
-int scheduleOnHour = 20;
-int scheduleOnMinute = 10;
-int scheduleDuration = 2; // Duration in minutes
+// Timer Schedules (up to 5 schedules)
+#define MAX_SCHEDULES 5
+int scheduleCount = 0;
+int scheduleOnHour[MAX_SCHEDULES] = {0};
+int scheduleOnMinute[MAX_SCHEDULES] = {0};
+int scheduleDuration[MAX_SCHEDULES] = {0}; // Duration in minutes
+bool scheduleEnabled[MAX_SCHEDULES] = {false};
 
 // NTP Time settings
 const char *ntpServer = "pool.ntp.org";
@@ -290,25 +293,55 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
 }
 
 void parseSchedule(String schedule) {
-  // Format: "HH:MM,D" where D is duration in minutes
-  // Example: "20:10,2" means ON at 20:10 for 2 minutes
-  int commaPos = schedule.indexOf(',');
-  if (commaPos > 0) {
-    String onTime = schedule.substring(0, commaPos);
-    String duration = schedule.substring(commaPos + 1);
-    int colonPos = onTime.indexOf(':');
-    if (colonPos > 0) {
-      scheduleOnHour = onTime.substring(0, colonPos).toInt();
-      scheduleOnMinute = onTime.substring(colonPos + 1).toInt();
-      scheduleDuration = duration.toInt();
-      if (scheduleDuration < 1)
-        scheduleDuration = 1; // Minimum 1 minute
-      if (scheduleDuration > 60)
-        scheduleDuration = 60; // Maximum 60 minutes
-      Serial.printf("📅 Schedule: ON at %02d:%02d for %d minutes\n",
-                    scheduleOnHour, scheduleOnMinute, scheduleDuration);
-    }
+  // Format: "HH:MM,D;HH:MM,D;HH:MM,D" for multiple schedules
+  // Example: "08:00,2;12:00,2;20:00,2" = 3 schedules
+
+  // Clear existing schedules
+  scheduleCount = 0;
+  for (int i = 0; i < MAX_SCHEDULES; i++) {
+    scheduleEnabled[i] = false;
   }
+
+  int startIdx = 0;
+  int schedIdx = 0;
+
+  while (startIdx < schedule.length() && schedIdx < MAX_SCHEDULES) {
+    int endIdx = schedule.indexOf(';', startIdx);
+    if (endIdx == -1)
+      endIdx = schedule.length();
+
+    String single = schedule.substring(startIdx, endIdx);
+    single.trim();
+
+    if (single.length() > 0) {
+      int commaPos = single.indexOf(',');
+      if (commaPos > 0) {
+        String onTime = single.substring(0, commaPos);
+        String duration = single.substring(commaPos + 1);
+        int colonPos = onTime.indexOf(':');
+        if (colonPos > 0) {
+          scheduleOnHour[schedIdx] = onTime.substring(0, colonPos).toInt();
+          scheduleOnMinute[schedIdx] = onTime.substring(colonPos + 1).toInt();
+          int dur = duration.toInt();
+          if (dur < 1)
+            dur = 1;
+          if (dur > 60)
+            dur = 60;
+          scheduleDuration[schedIdx] = dur;
+          scheduleEnabled[schedIdx] = true;
+
+          Serial.printf("📅 Schedule %d: ON at %02d:%02d for %d min\n",
+                        schedIdx + 1, scheduleOnHour[schedIdx],
+                        scheduleOnMinute[schedIdx], scheduleDuration[schedIdx]);
+          schedIdx++;
+        }
+      }
+    }
+    startIdx = endIdx + 1;
+  }
+
+  scheduleCount = schedIdx;
+  Serial.printf("📅 Total schedules: %d\n", scheduleCount);
 }
 
 void sendStatus(String status) {
@@ -358,20 +391,29 @@ void checkSchedule() {
     return;
 
   int now = timeinfo.tm_hour * 60 + timeinfo.tm_min;
-  int on = scheduleOnHour * 60 + scheduleOnMinute;
-  int off = on + scheduleDuration; // OFF time = ON time + duration
+  bool shouldBeOn = false;
 
-  // Handle midnight wrap-around
-  if (off >= 1440)
-    off -= 1440; // 1440 = 24*60 minutes
+  // Check all schedules
+  for (int i = 0; i < MAX_SCHEDULES; i++) {
+    if (!scheduleEnabled[i])
+      continue;
 
-  bool shouldBeOn;
-  if (on <= off) {
-    // Normal case: ON and OFF on same day
-    shouldBeOn = (now >= on && now < off);
-  } else {
-    // Wrap-around case: duration crosses midnight
-    shouldBeOn = (now >= on || now < off);
+    int on = scheduleOnHour[i] * 60 + scheduleOnMinute[i];
+    int off = on + scheduleDuration[i];
+
+    // Handle midnight wrap-around
+    if (off >= 1440)
+      off -= 1440;
+
+    if (on <= off) {
+      // Normal case: ON and OFF on same day
+      if (now >= on && now < off)
+        shouldBeOn = true;
+    } else {
+      // Wrap-around case: duration crosses midnight
+      if (now >= on || now < off)
+        shouldBeOn = true;
+    }
   }
 
   if (shouldBeOn && !audioOn) {
