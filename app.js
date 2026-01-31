@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════
-   AUDIO CONTROLLER - APP
-   MQTT WebSocket client for ESP32 control
+   AUDIO CONTROLLER - APP v3.0 (DFPlayer Edition)
+   MQTT WebSocket client for ESP32 + DFPlayer control
    ═══════════════════════════════════════════════════════════════ */
 
 // MQTT Configuration
@@ -8,9 +8,12 @@ const MQTT_BROKER = 'wss://broker.hivemq.com:8884/mqtt';
 const TOPIC_CONTROL = 'audio/control';
 const TOPIC_STATUS = 'audio/status';
 const TOPIC_SCHEDULE = 'audio/schedule';
+const TOPIC_SOUND = 'audio/sound';
 
 let client = null;
 let isConnected = false;
+let isPlaying = false;
+let currentVolume = 25;
 
 // ═══════════════════════════════════════════════════════════════
 // MQTT Connection
@@ -89,14 +92,20 @@ function updatePowerStatus(isOn) {
     const powerIcon = document.getElementById('powerIcon');
     const powerLabel = document.getElementById('powerLabel');
     const audioStatus = document.getElementById('audioStatus');
+    const audioStatusBadge = document.getElementById('audioStatusBadge');
+    const btnPlayPause = document.getElementById('btnPlayPause');
 
     if (isOn) {
         powerIcon.classList.add('on');
         powerIcon.classList.remove('off');
         powerLabel.textContent = 'ON';
         powerLabel.style.color = '#10b981';
-        audioStatus.textContent = 'Playing 10kHz';
+        audioStatus.textContent = 'Playing';
         audioStatus.style.color = '#10b981';
+        audioStatusBadge.textContent = 'ON';
+        audioStatusBadge.style.color = '#10b981';
+        btnPlayPause.textContent = '⏸️';
+        isPlaying = true;
     } else {
         powerIcon.classList.remove('on');
         powerIcon.classList.add('off');
@@ -104,6 +113,10 @@ function updatePowerStatus(isOn) {
         powerLabel.style.color = '#71717a';
         audioStatus.textContent = 'Silent';
         audioStatus.style.color = '#71717a';
+        audioStatusBadge.textContent = 'OFF';
+        audioStatusBadge.style.color = '#71717a';
+        btnPlayPause.textContent = '▶️';
+        isPlaying = false;
     }
 }
 
@@ -137,9 +150,17 @@ function handleStatusUpdate(payload) {
             document.getElementById('ipAddress').textContent = data.ip;
         }
 
-        // Update time
-        if (data.time) {
-            document.getElementById('deviceTime').textContent = data.time;
+        // Update volume
+        if (data.volume !== undefined) {
+            currentVolume = data.volume;
+            document.getElementById('volumeSlider').value = data.volume;
+            document.getElementById('volumeValue').textContent = data.volume;
+            document.getElementById('volumeStatus').textContent = data.volume;
+        }
+
+        // Update track
+        if (data.track !== undefined) {
+            document.getElementById('currentTrack').textContent = data.track;
         }
 
         // Update schedule display
@@ -155,9 +176,9 @@ function handleStatusUpdate(payload) {
 
         // Log status
         if (data.status === 'audio_on') {
-            addLog('🔊 Tweeter turned ON', 'success');
+            addLog('🔊 Audio turned ON', 'success');
         } else if (data.status === 'audio_off') {
-            addLog('🔇 Tweeter turned OFF');
+            addLog('🔇 Audio turned OFF');
         } else if (data.status === 'online') {
             addLog('📡 Device online', 'success');
         }
@@ -178,16 +199,49 @@ function sendCommand(command) {
     }
 
     client.publish(TOPIC_CONTROL, command);
-    addLog(`📤 Sent command: ${command}`);
+    addLog(`📤 Sent: ${command.toUpperCase()}`);
+}
 
-    // Visual feedback
-    const btn = document.getElementById('btn' + command.charAt(0).toUpperCase() + command.slice(1).toLowerCase());
-    if (btn) {
-        btn.style.transform = 'scale(0.95)';
-        setTimeout(() => {
-            btn.style.transform = '';
-        }, 100);
+function togglePower() {
+    if (isPlaying) {
+        sendCommand('OFF');
+    } else {
+        sendCommand('ON');
     }
+}
+
+function togglePlayPause() {
+    if (isPlaying) {
+        sendCommand('pause');
+        addLog('⏸️ Paused');
+    } else {
+        sendCommand('play');
+        addLog('▶️ Playing');
+    }
+}
+
+function setVolume(value) {
+    if (!isConnected) {
+        addLog('Not connected to broker', 'error');
+        return;
+    }
+
+    client.publish(TOPIC_CONTROL, `vol_${value}`);
+    addLog(`🔊 Volume: ${value}`);
+}
+
+function updateVolumeDisplay(value) {
+    document.getElementById('volumeValue').textContent = value;
+}
+
+function playTrack(trackNumber) {
+    if (!isConnected) {
+        addLog('Not connected to broker', 'error');
+        return;
+    }
+
+    client.publish(TOPIC_SOUND, trackNumber.toString());
+    addLog(`🎵 Playing track ${trackNumber}`, 'success');
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -294,7 +348,6 @@ function saveAllSchedules() {
         return;
     }
 
-    // Format: "08:00,2;12:00,2;20:00,2"
     const scheduleStr = schedules.join(';');
     client.publish(TOPIC_SCHEDULE, scheduleStr);
 
@@ -325,7 +378,6 @@ function addLog(message, type = '') {
 
     container.insertBefore(logItem, container.firstChild);
 
-    // Keep only last 50 logs
     while (container.children.length > 50) {
         container.removeChild(container.lastChild);
     }
@@ -342,27 +394,20 @@ function clearLog() {
 // ═══════════════════════════════════════════════════════════════
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Connect to MQTT
     connectMQTT();
 
-    // Update local time display
-    setInterval(() => {
-        const now = new Date();
-        // Update footer or any local time display if needed
-    }, 1000);
-
-    // Schedule toggle handler
     document.getElementById('scheduleToggle').addEventListener('change', (e) => {
         if (e.target.checked) {
             sendCommand('AUTO');
-            addLog('Switched to AUTO mode (schedule enabled)');
+            addLog('Switched to AUTO mode');
         } else {
-            addLog('Schedule disabled - using manual control');
+            sendCommand('MANUAL');
+            addLog('Switched to MANUAL mode');
         }
     });
 });
 
-// Service Worker Registration (for PWA)
+// Service Worker Registration
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js')

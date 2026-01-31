@@ -1,29 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#18181b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Audio Controller</title>
-    <meta name="description" content="ESP32 Audio Tweeter Control Panel">
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#1a1a2e">
-    <link rel="icon"
-        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔊</text></svg>">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔊</text></svg>">
     <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
-
 <body>
     <div class="container">
         <!-- Header -->
         <header class="header">
-            <div class="logo">
-                <span class="logo-icon">🔊</span>
-                <div class="logo-text">
-                    <h1>Audio Controller</h1>
-                    <p class="subtitle">ESP32 + PAM8403 + AXC1000</p>
-                </div>
+            <div class="header-content">
+                <h1>🔊 Audio Controller</h1>
+                <p class="subtitle">ESP32 + DFPlayer + PAM8403</p>
             </div>
             <div class="connection-status" id="connectionStatus">
                 <span class="status-dot"></span>
@@ -31,122 +26,130 @@
             </div>
         </header>
 
-        <!-- Main Control Card -->
-        <div class="card main-control">
-            <div class="card-header">
-                <h2>🎛️ Power Control</h2>
-                <span class="mode-badge" id="modeBadge">AUTO</span>
-            </div>
-            <div class="power-section">
-                <div class="power-status" id="powerStatus">
-                    <div class="power-icon off" id="powerIcon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 2v10M18.4 6.6a9 9 0 1 1-12.8 0" />
-                        </svg>
-                    </div>
+        <!-- Power Control -->
+        <section class="card">
+            <h2>🎛️ Power Control</h2>
+            <div class="power-control">
+                <button class="power-btn off" id="powerIcon" onclick="togglePower()">
+                    <span class="power-icon">⏻</span>
+                </button>
+                <div class="power-info">
                     <span class="power-label" id="powerLabel">OFF</span>
-                </div>
-                <div class="control-buttons">
-                    <button class="btn btn-on" id="btnOn" onclick="sendCommand('ON')">
-                        <span>🔊</span> ON
-                    </button>
-                    <button class="btn btn-off" id="btnOff" onclick="sendCommand('OFF')">
-                        <span>🔇</span> OFF
-                    </button>
-                    <button class="btn btn-auto" id="btnAuto" onclick="sendCommand('AUTO')">
-                        <span>🔄</span> AUTO
-                    </button>
+                    <span class="audio-status" id="audioStatus">Silent</span>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <!-- Schedule Card -->
-        <div class="card schedule-card">
-            <div class="card-header">
-                <h2>⏰ Timer Schedules</h2>
-                <label class="toggle">
-                    <input type="checkbox" id="scheduleToggle" checked>
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-            <div class="schedule-content">
-                <div class="schedule-list" id="scheduleList">
-                    <!-- Schedule entries will be added here -->
+        <!-- Audio Player Controls (NEW) -->
+        <section class="card">
+            <h2>🎵 Audio Player</h2>
+            <div class="player-controls">
+                <div class="player-buttons">
+                    <button class="player-btn" onclick="sendCommand('prev')" title="Previous">⏮️</button>
+                    <button class="player-btn play-btn" id="btnPlayPause" onclick="togglePlayPause()">▶️</button>
+                    <button class="player-btn" onclick="sendCommand('next')" title="Next">⏭️</button>
                 </div>
-                <button class="btn btn-add" id="btnAddSchedule" onclick="addScheduleRow()">
+                
+                <div class="volume-control">
+                    <span class="volume-icon">🔈</span>
+                    <input type="range" id="volumeSlider" min="0" max="30" value="25" 
+                           oninput="updateVolumeDisplay(this.value)" 
+                           onchange="setVolume(this.value)">
+                    <span class="volume-value" id="volumeValue">25</span>
+                    <span class="volume-icon">🔊</span>
+                </div>
+                
+                <div class="track-info">
+                    <span>Track: <strong id="currentTrack">1</strong></span>
+                </div>
+                
+                <div class="track-selector">
+                    <span class="track-label">Quick Play:</span>
+                    <div class="track-buttons">
+                        <button class="track-btn" onclick="playTrack(1)">1</button>
+                        <button class="track-btn" onclick="playTrack(2)">2</button>
+                        <button class="track-btn" onclick="playTrack(3)">3</button>
+                        <button class="track-btn" onclick="playTrack(4)">4</button>
+                        <button class="track-btn" onclick="playTrack(5)">5</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Timer Schedules -->
+        <section class="card">
+            <h2>⏰ Timer Schedules</h2>
+            <p class="hint">Click "Add Schedule" to create up to 5 schedules</p>
+            
+            <div class="schedule-list" id="scheduleList"></div>
+            
+            <div class="schedule-actions">
+                <button class="btn btn-secondary" id="btnAddSchedule" onclick="addScheduleRow()">
                     ➕ Add Schedule
                 </button>
-                <button class="btn btn-schedule" onclick="saveAllSchedules()">
-                    💾 Save All Schedules
+                <button class="btn btn-primary" onclick="saveAllSchedules()">
+                    💾 Save All
                 </button>
-                <p class="schedule-info" id="scheduleInfo">
-                    Click "Add Schedule" to create up to 5 schedules
-                </p>
             </div>
-        </div>
+            
+            <div class="schedule-toggle">
+                <label class="toggle-label">
+                    <input type="checkbox" id="scheduleToggle">
+                    <span class="toggle-slider"></span>
+                    <span class="toggle-text">Enable Schedule Mode</span>
+                </label>
+            </div>
+            
+            <p class="schedule-info" id="scheduleInfo">No schedules set</p>
+        </section>
 
-        <!-- Status Card -->
-        <div class="card status-card">
-            <div class="card-header">
-                <h2>📊 Device Status</h2>
-                <span class="last-update" id="lastUpdate">--</span>
-            </div>
+        <!-- Device Status -->
+        <section class="card">
+            <h2>📊 Device Status</h2>
             <div class="status-grid">
                 <div class="status-item">
-                    <span class="status-icon">📶</span>
-                    <div class="status-info">
-                        <span class="status-label">Connection</span>
-                        <span class="status-value" id="connStatus">--</span>
-                    </div>
+                    <span class="status-label">Connection</span>
+                    <span class="status-value" id="connStatus">Offline</span>
                 </div>
                 <div class="status-item">
-                    <span class="status-icon">🌐</span>
-                    <div class="status-info">
-                        <span class="status-label">IP Address</span>
-                        <span class="status-value" id="ipAddress">--</span>
-                    </div>
+                    <span class="status-label">Audio</span>
+                    <span class="status-value" id="audioStatusBadge">OFF</span>
                 </div>
                 <div class="status-item">
-                    <span class="status-icon">🕐</span>
-                    <div class="status-info">
-                        <span class="status-label">Device Time</span>
-                        <span class="status-value" id="deviceTime">--</span>
-                    </div>
+                    <span class="status-label">Mode</span>
+                    <span class="status-value mode-badge" id="modeBadge">MANUAL</span>
                 </div>
                 <div class="status-item">
-                    <span class="status-icon">🔊</span>
-                    <div class="status-info">
-                        <span class="status-label">Audio</span>
-                        <span class="status-value" id="audioStatus">--</span>
-                    </div>
+                    <span class="status-label">Volume</span>
+                    <span class="status-value" id="volumeStatus">25</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">IP Address</span>
+                    <span class="status-value" id="ipAddress">--</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Last Update</span>
+                    <span class="status-value" id="lastUpdate">--</span>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <!-- Log Card -->
-        <div class="card log-card">
-            <div class="card-header">
+        <!-- Activity Log -->
+        <section class="card">
+            <div class="log-header">
                 <h2>📝 Activity Log</h2>
-                <button class="btn-clear" onclick="clearLog()">Clear</button>
+                <button class="btn btn-small" onclick="clearLog()">Clear</button>
             </div>
-            <div class="log-container" id="logContainer">
-                <div class="log-item">
-                    <span class="log-time">--:--:--</span>
-                    <span class="log-message">Waiting for connection...</span>
-                </div>
-            </div>
-        </div>
+            <div class="log-container" id="logContainer"></div>
+        </section>
 
         <!-- Footer -->
         <footer class="footer">
-            <p>Audio Controller v2.0</p>
-            <p class="footer-link">MQTT Broker: broker.hivemq.com</p>
+            <p>Audio Controller v3.0 | DFPlayer Edition</p>
+            <p class="broker-info">MQTT: broker.hivemq.com</p>
         </footer>
     </div>
 
-    <!-- MQTT Library -->
-    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <script src="app.js"></script>
 </body>
-
 </html>
