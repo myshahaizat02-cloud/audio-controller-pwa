@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -8,10 +9,12 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Audio Controller</title>
     <link rel="manifest" href="manifest.json">
-    <link rel="icon" type="image/png" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔊</text></svg>">
+    <link rel="icon" type="image/png"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔊</text></svg>">
     <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
+
 <body>
     <div class="container">
         <!-- Header -->
@@ -49,20 +52,19 @@
                     <button class="player-btn play-btn" id="btnPlayPause" onclick="togglePlayPause()">▶️</button>
                     <button class="player-btn" onclick="sendCommand('next')" title="Next">⏭️</button>
                 </div>
-                
+
                 <div class="volume-control">
                     <span class="volume-icon">🔈</span>
-                    <input type="range" id="volumeSlider" min="0" max="30" value="25" 
-                           oninput="updateVolumeDisplay(this.value)" 
-                           onchange="setVolume(this.value)">
+                    <input type="range" id="volumeSlider" min="0" max="30" value="25"
+                        oninput="updateVolumeDisplay(this.value)" onchange="setVolume(this.value)">
                     <span class="volume-value" id="volumeValue">25</span>
                     <span class="volume-icon">🔊</span>
                 </div>
-                
+
                 <div class="track-info">
                     <span>Track: <strong id="currentTrack">1</strong></span>
                 </div>
-                
+
                 <div class="track-selector">
                     <span class="track-label">Quick Play:</span>
                     <div class="track-buttons">
@@ -76,32 +78,74 @@
             </div>
         </section>
 
-        <!-- Timer Schedules -->
-        <section class="card">
-            <h2>⏰ Timer Schedules</h2>
-            <p class="hint">Click "Add Schedule" to create up to 5 schedules</p>
-            
-            <div class="schedule-list" id="scheduleList"></div>
-            
-            <div class="schedule-actions">
-                <button class="btn btn-secondary" id="btnAddSchedule" onclick="addScheduleRow()">
-                    ➕ Add Schedule
-                </button>
-                <button class="btn btn-primary" onclick="saveAllSchedules()">
-                    💾 Save All
+        <!-- Alarm Schedules -->
+        <section class="card alarm-section">
+            <h2>⏰ Alarm Schedules</h2>
+
+            <!-- Add Alarm Form -->
+            <div class="add-alarm-form">
+                <div class="alarm-time-inputs">
+                    <div class="time-field">
+                        <label>Hour</label>
+                        <input type="number" id="alarmHour" min="0" max="23" value="08" placeholder="HH">
+                    </div>
+                    <span class="time-colon">:</span>
+                    <div class="time-field">
+                        <label>Min</label>
+                        <input type="number" id="alarmMinute" min="0" max="59" value="00" placeholder="MM">
+                    </div>
+                </div>
+
+                <div class="alarm-label-field">
+                    <input type="text" id="alarmLabel" placeholder="Label (optional)">
+                </div>
+
+                <div class="alarm-days-selector">
+                    <span class="days-label">Repeat:</span>
+                    <div class="days-buttons">
+                        <button type="button" class="day-btn" data-day="0">S</button>
+                        <button type="button" class="day-btn" data-day="1">M</button>
+                        <button type="button" class="day-btn" data-day="2">T</button>
+                        <button type="button" class="day-btn" data-day="3">W</button>
+                        <button type="button" class="day-btn" data-day="4">T</button>
+                        <button type="button" class="day-btn" data-day="5">F</button>
+                        <button type="button" class="day-btn" data-day="6">S</button>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-add-alarm" id="btnAddAlarm">
+                    ➕ Add Alarm
                 </button>
             </div>
-            
+
+            <!-- Alarms List -->
+            <div class="alarms-list" id="alarmsList">
+                <div class="empty-alarms" id="emptyAlarms">
+                    <span>🔔</span>
+                    <p>No alarms set</p>
+                </div>
+            </div>
+
+            <!-- Schedule Mode Toggle -->
             <div class="schedule-toggle">
                 <label class="toggle-label">
                     <input type="checkbox" id="scheduleToggle">
                     <span class="toggle-slider"></span>
-                    <span class="toggle-text">Enable Schedule Mode</span>
+                    <span class="toggle-text">Enable Auto Mode</span>
                 </label>
             </div>
-            
-            <p class="schedule-info" id="scheduleInfo">No schedules set</p>
         </section>
+
+        <!-- Alarm Modal -->
+        <div class="alarm-modal" id="alarmModal">
+            <div class="alarm-modal-content">
+                <div class="alarm-modal-icon">⏰</div>
+                <h2 id="alarmModalTitle">Alarm!</h2>
+                <p class="alarm-modal-time" id="alarmModalTime">08:00</p>
+                <button class="btn btn-primary btn-dismiss" id="btnDismiss">Dismiss</button>
+                <button class="btn btn-secondary btn-snooze" id="btnSnooze">Snooze 5 min</button>
+            </div>
+        </div>
 
         <!-- Device Status -->
         <section class="card">
@@ -152,4 +196,5 @@
 
     <script src="app.js"></script>
 </body>
+
 </html>

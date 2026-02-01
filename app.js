@@ -245,115 +245,255 @@ function playTrack(trackNumber) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Multiple Schedules
+// Alarm System
 // ═══════════════════════════════════════════════════════════════
 
-const MAX_SCHEDULES = 5;
-let scheduleCount = 0;
+let alarms = JSON.parse(localStorage.getItem('audioAlarms')) || [];
+let activeAlarmId = null;
+const DAY_NAMES = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const DAY_FULL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-function addScheduleRow() {
-    if (scheduleCount >= MAX_SCHEDULES) {
-        addLog(`Maximum ${MAX_SCHEDULES} schedules allowed`, 'error');
+// Format time helper
+function formatTime(h, m) {
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+// Add new alarm
+function addAlarm() {
+    const hour = parseInt(document.getElementById('alarmHour').value) || 0;
+    const minute = parseInt(document.getElementById('alarmMinute').value) || 0;
+    const label = document.getElementById('alarmLabel').value.trim();
+
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+        addLog('Invalid time (0-23 hours, 0-59 minutes)', 'error');
         return;
     }
 
-    const container = document.getElementById('scheduleList');
-    const index = scheduleCount;
-    scheduleCount++;
+    // Get selected days
+    const selectedDays = [];
+    document.querySelectorAll('.day-btn.active').forEach(btn => {
+        selectedDays.push(parseInt(btn.dataset.day));
+    });
 
-    const row = document.createElement('div');
-    row.className = 'schedule-row';
-    row.id = `schedule-row-${index}`;
-    row.innerHTML = `
-        <span class="schedule-num">${scheduleCount}</span>
-        <div class="time-input-wrapper">
-            <input type="time" id="onTime-${index}" value="08:00">
-        </div>
-        <span class="schedule-sep">+</span>
-        <div class="duration-input-wrapper">
-            <input type="number" id="duration-${index}" value="2" min="1" max="60">
-            <span class="duration-unit">min</span>
-        </div>
-        <button class="btn-remove" onclick="removeScheduleRow(${index})">✕</button>
-    `;
+    const alarm = {
+        id: Date.now(),
+        hour,
+        minute,
+        label: label || 'Alarm',
+        days: selectedDays,
+        enabled: true
+    };
 
-    container.appendChild(row);
-    updateAddButton();
-    addLog(`Schedule ${scheduleCount} added`);
+    alarms.push(alarm);
+    saveAlarms();
+    renderAlarms();
+
+    // Reset form
+    document.getElementById('alarmLabel').value = '';
+    document.querySelectorAll('.day-btn').forEach(btn => btn.classList.remove('active'));
+
+    addLog(`⏰ Alarm added: ${formatTime(hour, minute)}`, 'success');
+
+    // Send to ESP32 via MQTT
+    syncAlarmsToESP32();
 }
 
-function removeScheduleRow(index) {
-    const row = document.getElementById(`schedule-row-${index}`);
-    if (row) {
-        row.remove();
-        scheduleCount--;
-        updateAddButton();
-        renumberSchedules();
-        addLog('Schedule removed');
+// Toggle alarm on/off
+function toggleAlarm(id) {
+    const alarm = alarms.find(a => a.id === id);
+    if (alarm) {
+        alarm.enabled = !alarm.enabled;
+        saveAlarms();
+        renderAlarms();
+        addLog(`Alarm ${formatTime(alarm.hour, alarm.minute)} ${alarm.enabled ? 'enabled' : 'disabled'}`);
+        syncAlarmsToESP32();
     }
 }
 
-function renumberSchedules() {
-    const rows = document.querySelectorAll('.schedule-row');
-    rows.forEach((row, i) => {
-        const numEl = row.querySelector('.schedule-num');
-        if (numEl) numEl.textContent = i + 1;
+// Delete alarm
+function deleteAlarm(id) {
+    const alarm = alarms.find(a => a.id === id);
+    if (alarm) {
+        alarms = alarms.filter(a => a.id !== id);
+        saveAlarms();
+        renderAlarms();
+        addLog(`Alarm ${formatTime(alarm.hour, alarm.minute)} deleted`);
+        syncAlarmsToESP32();
+    }
+}
+
+// Save alarms to localStorage
+function saveAlarms() {
+    localStorage.setItem('audioAlarms', JSON.stringify(alarms));
+}
+
+// Sync alarms to ESP32 via MQTT
+function syncAlarmsToESP32() {
+    if (!isConnected) return;
+
+    const enabledAlarms = alarms.filter(a => a.enabled);
+    const scheduleData = enabledAlarms.map(a => {
+        const daysStr = a.days.length > 0 ? a.days.join(',') : '*';
+        return `${formatTime(a.hour, a.minute)}|${daysStr}`;
+    }).join(';');
+
+    client.publish(TOPIC_SCHEDULE, scheduleData);
+}
+
+// Render alarms list
+function renderAlarms() {
+    const container = document.getElementById('alarmsList');
+    const emptyState = document.getElementById('emptyAlarms');
+
+    // Clear existing cards
+    container.querySelectorAll('.alarm-card').forEach(card => card.remove());
+
+    if (alarms.length === 0) {
+        emptyState.style.display = 'block';
+        return;
+    }
+
+    emptyState.style.display = 'none';
+
+    // Sort by time
+    const sorted = [...alarms].sort((a, b) => {
+        if (a.hour !== b.hour) return a.hour - b.hour;
+        return a.minute - b.minute;
+    });
+
+    sorted.forEach(alarm => {
+        const card = document.createElement('div');
+        card.className = `alarm-card${alarm.enabled ? '' : ' disabled'}`;
+
+        // Days badges
+        let daysHtml = '<div class="alarm-card-days">';
+        if (alarm.days.length === 0) {
+            daysHtml += '<span class="alarm-day-badge active">Once</span>';
+        } else {
+            for (let i = 0; i < 7; i++) {
+                const isActive = alarm.days.includes(i);
+                daysHtml += `<span class="alarm-day-badge${isActive ? ' active' : ''}">${DAY_NAMES[i]}</span>`;
+            }
+        }
+        daysHtml += '</div>';
+
+        card.innerHTML = `
+            <div class="alarm-card-info">
+                <div class="alarm-card-time">${formatTime(alarm.hour, alarm.minute)}</div>
+                <div class="alarm-card-label">${alarm.label}</div>
+                ${daysHtml}
+            </div>
+            <div class="alarm-card-controls">
+                <label class="alarm-toggle">
+                    <input type="checkbox" ${alarm.enabled ? 'checked' : ''}>
+                    <span class="alarm-toggle-slider"></span>
+                </label>
+                <button class="alarm-delete-btn">🗑️</button>
+            </div>
+        `;
+
+        // Event listeners
+        card.querySelector('.alarm-toggle input').addEventListener('change', () => toggleAlarm(alarm.id));
+        card.querySelector('.alarm-delete-btn').addEventListener('click', () => deleteAlarm(alarm.id));
+
+        container.appendChild(card);
     });
 }
 
-function updateAddButton() {
-    const btn = document.getElementById('btnAddSchedule');
-    if (scheduleCount >= MAX_SCHEDULES) {
-        btn.disabled = true;
-        btn.textContent = `Max ${MAX_SCHEDULES} schedules`;
-    } else {
-        btn.disabled = false;
-        btn.textContent = '➕ Add Schedule';
-    }
-}
+// Check alarms every second
+function checkAlarms() {
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const currentSecond = now.getSeconds();
+    const currentDay = now.getDay();
 
-function saveAllSchedules() {
-    if (!isConnected) {
-        addLog('Not connected to broker', 'error');
-        return;
-    }
+    if (currentSecond !== 0) return;
 
-    const rows = document.querySelectorAll('.schedule-row');
-    if (rows.length === 0) {
-        addLog('Add at least one schedule', 'error');
-        return;
-    }
+    alarms.forEach(alarm => {
+        if (!alarm.enabled) return;
 
-    const schedules = [];
-    let valid = true;
-
-    rows.forEach((row) => {
-        const timeInput = row.querySelector('input[type="time"]');
-        const durationInput = row.querySelector('input[type="number"]');
-
-        if (timeInput && durationInput) {
-            const time = timeInput.value;
-            const duration = parseInt(durationInput.value);
-
-            if (!time || duration < 1 || duration > 60) {
-                valid = false;
-            } else {
-                schedules.push(`${time},${duration}`);
+        if (alarm.hour === currentHour && alarm.minute === currentMinute) {
+            if (alarm.days.length === 0 || alarm.days.includes(currentDay)) {
+                triggerAlarm(alarm);
             }
         }
     });
+}
 
-    if (!valid) {
-        addLog('Invalid schedule values', 'error');
-        return;
+// Trigger alarm
+function triggerAlarm(alarm) {
+    activeAlarmId = alarm.id;
+    const timeStr = formatTime(alarm.hour, alarm.minute);
+
+    document.getElementById('alarmModalTitle').textContent = alarm.label;
+    document.getElementById('alarmModalTime').textContent = timeStr;
+    document.getElementById('alarmModal').classList.add('active');
+
+    // Turn ON audio via MQTT
+    if (isConnected) {
+        sendCommand('ON');
+        addLog(`⏰ ALARM: ${alarm.label} - Audio ON`, 'success');
     }
 
-    const scheduleStr = schedules.join(';');
-    client.publish(TOPIC_SCHEDULE, scheduleStr);
+    // Browser notification
+    if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(alarm.label, { body: `Alarm: ${timeStr}` });
+    }
+}
 
-    addLog(`📅 Saved ${schedules.length} schedule(s)`, 'success');
-    document.getElementById('scheduleInfo').textContent =
-        `${schedules.length} schedule(s) saved`;
+// Dismiss alarm
+function dismissAlarm() {
+    document.getElementById('alarmModal').classList.remove('active');
+
+    // Turn OFF audio
+    if (isConnected) {
+        sendCommand('OFF');
+    }
+
+    // If it's a one-time alarm, disable it
+    if (activeAlarmId) {
+        const alarm = alarms.find(a => a.id === activeAlarmId);
+        if (alarm && alarm.days.length === 0) {
+            alarm.enabled = false;
+            saveAlarms();
+            renderAlarms();
+        }
+    }
+
+    activeAlarmId = null;
+    addLog('Alarm dismissed');
+}
+
+// Snooze alarm (5 minutes)
+function snoozeAlarm() {
+    document.getElementById('alarmModal').classList.remove('active');
+
+    // Turn OFF audio temporarily
+    if (isConnected) {
+        sendCommand('OFF');
+    }
+
+    // Create snooze alarm
+    const now = new Date();
+    now.setMinutes(now.getMinutes() + 5);
+
+    const originalAlarm = alarms.find(a => a.id === activeAlarmId);
+    const snoozeAlarm = {
+        id: Date.now(),
+        hour: now.getHours(),
+        minute: now.getMinutes(),
+        label: `${originalAlarm ? originalAlarm.label : 'Alarm'} (Snoozed)`,
+        days: [],
+        enabled: true
+    };
+
+    alarms.push(snoozeAlarm);
+    saveAlarms();
+    renderAlarms();
+
+    activeAlarmId = null;
+    addLog(`⏰ Snoozed for 5 minutes`, 'success');
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -396,6 +536,7 @@ function clearLog() {
 document.addEventListener('DOMContentLoaded', () => {
     connectMQTT();
 
+    // Schedule toggle (AUTO/MANUAL mode)
     document.getElementById('scheduleToggle').addEventListener('change', (e) => {
         if (e.target.checked) {
             sendCommand('AUTO');
@@ -405,6 +546,42 @@ document.addEventListener('DOMContentLoaded', () => {
             addLog('Switched to MANUAL mode');
         }
     });
+
+    // Alarm form - Add button
+    document.getElementById('btnAddAlarm').addEventListener('click', addAlarm);
+
+    // Day selector buttons
+    document.querySelectorAll('.day-btn').forEach(btn => {
+        btn.addEventListener('click', () => btn.classList.toggle('active'));
+    });
+
+    // Alarm modal buttons
+    document.getElementById('btnDismiss').addEventListener('click', dismissAlarm);
+    document.getElementById('btnSnooze').addEventListener('click', snoozeAlarm);
+
+    // Input validation
+    document.getElementById('alarmHour').addEventListener('input', (e) => {
+        let val = parseInt(e.target.value);
+        if (val < 0) e.target.value = 0;
+        if (val > 23) e.target.value = 23;
+    });
+
+    document.getElementById('alarmMinute').addEventListener('input', (e) => {
+        let val = parseInt(e.target.value);
+        if (val < 0) e.target.value = 0;
+        if (val > 59) e.target.value = 59;
+    });
+
+    // Check alarms every second
+    setInterval(checkAlarms, 1000);
+
+    // Request notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+
+    // Render saved alarms
+    renderAlarms();
 });
 
 // Service Worker Registration
