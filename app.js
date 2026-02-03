@@ -268,10 +268,16 @@ function formatTime(h, m) {
 function addAlarm() {
     const hour = parseInt(document.getElementById('alarmHour').value) || 0;
     const minute = parseInt(document.getElementById('alarmMinute').value) || 0;
+    const duration = parseInt(document.getElementById('alarmDuration').value) || 5;
     const label = document.getElementById('alarmLabel').value.trim();
 
     if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
         addLog('Invalid time (0-23 hours, 0-59 minutes)', 'error');
+        return;
+    }
+
+    if (duration < 1 || duration > 60) {
+        addLog('Invalid duration (1-60 minutes)', 'error');
         return;
     }
 
@@ -285,6 +291,7 @@ function addAlarm() {
         id: Date.now(),
         hour,
         minute,
+        duration,
         label: label || 'Alarm',
         days: selectedDays,
         enabled: true
@@ -298,10 +305,14 @@ function addAlarm() {
     document.getElementById('alarmLabel').value = '';
     document.querySelectorAll('.day-btn').forEach(btn => btn.classList.remove('active'));
 
-    addLog(`⏰ Alarm added: ${formatTime(hour, minute)}`, 'success');
+    addLog(`⏰ Alarm added: ${formatTime(hour, minute)} for ${duration} min`, 'success');
 
-    // Send to ESP32 via MQTT
-    syncAlarmsToESP32();
+    // Send to ESP32 via MQTT (format: HH:MM,DURATION)
+    if (isConnected) {
+        const alarmCommand = `${formatTime(hour, minute)},${duration}`;
+        client.publish(TOPIC_ALARM, alarmCommand);
+        addLog(`📤 Sent alarm to ESP32: ${alarmCommand}`, 'success');
+    }
 }
 
 // Toggle alarm on/off
@@ -386,7 +397,7 @@ function renderAlarms() {
         card.innerHTML = `
             <div class="alarm-card-info">
                 <div class="alarm-card-time">${formatTime(alarm.hour, alarm.minute)}</div>
-                <div class="alarm-card-label">${alarm.label}</div>
+                <div class="alarm-card-label">${alarm.label} <span style="color:#a855f7;font-size:0.8em;">(${alarm.duration || 5} min)</span></div>
                 ${daysHtml}
             </div>
             <div class="alarm-card-controls">
