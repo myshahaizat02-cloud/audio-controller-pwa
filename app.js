@@ -3,12 +3,15 @@
    MQTT WebSocket client for ESP32 + DFPlayer control
    ═══════════════════════════════════════════════════════════════ */
 
-// MQTT Configuration
-const MQTT_BROKER = 'wss://broker.hivemq.com:8884/mqtt';
+// MQTT Configuration - MUST MATCH ESP32 SETTINGS
+const MQTT_BROKER = 'wss://c13890d5b97c47339681ed1f71e7026f.s1.eu.hivemq.cloud:8884/mqtt';
+const MQTT_USERNAME = 'dante';
+const MQTT_PASSWORD = 'Dante1234';
 const TOPIC_CONTROL = 'audio/control';
 const TOPIC_STATUS = 'audio/status';
 const TOPIC_SCHEDULE = 'audio/schedule';
 const TOPIC_SOUND = 'audio/sound';
+const TOPIC_ALARM = 'audio/alarm';
 
 let client = null;
 let isConnected = false;
@@ -22,12 +25,15 @@ let currentVolume = 25;
 function connectMQTT() {
     const clientId = 'web_' + Math.random().toString(16).substr(2, 8);
 
-    addLog('Connecting to MQTT broker...');
+    addLog('Connecting to HiveMQ Cloud...');
+    console.log('Connecting to:', MQTT_BROKER);
 
     client = mqtt.connect(MQTT_BROKER, {
         clientId: clientId,
+        username: MQTT_USERNAME,
+        password: MQTT_PASSWORD,
         clean: true,
-        connectTimeout: 4000,
+        connectTimeout: 10000,
         reconnectPeriod: 5000
     });
 
